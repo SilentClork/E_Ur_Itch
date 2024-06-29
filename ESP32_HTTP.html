@@ -1,0 +1,195 @@
+<!--
+Espec: Open-source Web Interface for Light Measurement System
+
+Description:
+Espec is an HTML interface designed to communicate with an Arduino-based Light Measurement System. Users can access measurements, change settings, and receive notifications based on the light data through this interface.
+
+Assembly and Connection:
+1. Ensure the Arduino system is running the provided open-source Arduino code.
+2. Connect the system to the same network as the Espec interface.
+3. Open Espec in a web browser and input the appropriate IP or address of the Arduino system.
+
+Note:
+- Ensure a stable network connection between the Arduino system and the Espec interface.
+- Espec is open-source and can be modified and shared freely. Please attribute the original author when sharing or modifying.
+- Always test in a safe environment before deploying.
+
+Author: CSMU-Taiwan
+License: MIT
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>ESP32Web</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .boldText {
+            font-weight: bold;
+        }
+
+        .input1,
+        .text1,
+        .input2,
+        .text2 {
+            display: inline-block;
+        }
+
+        .input1,
+        .input2 {
+            width: 100px;
+            height: 30px;
+        }
+
+        .custom-padding-btn {
+            padding-top: 1px;
+            padding-bottom: 1px;
+            text-align: center;
+        }
+
+        .custom-padding-btn:nth-child(2) {
+            margin-left: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>ESP32Web</h1>
+
+    <input style=" margin-right: 1%; padding: 10px;" type="text" id="ipAddress" placeholder="Enter ESP32 IP">
+    <button style="width: 30%; margin-left: 1%; margin-right: 1%; padding: 8px 12px;" class="btn btn-success"
+        onclick="confirmIP()">Confirm IP</button>
+
+    <h1>Data From Arduino</h1>
+    <div id="dataContainer">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th scope="col">Data Type</th>
+                    <th scope="col">Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>溫度</td>
+                    <td id="temp">Not test yet</td>
+                </tr>
+                <tr>
+                    <td>濕度</td>
+                    <td id="humid">Not test yet</td>
+                </tr>
+                <tr>
+                    <td>有害氣體</td>
+                    <td id="toxgas">Not test yet</td>
+                </tr>
+                <tr>
+                    <td>懸浮微粒</td>
+                    <td id="partic">Not test yet</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>Air purifier</h1>
+    <div style="display: flex; justify-content: space-between; padding: 10px;">
+        <button class="btn btn-danger" style="width: 33%; margin-right: 1%; padding: 8px 12px;"
+            onclick="sendCommand('on')">On</button>
+        <button class="btn btn-success" style="width: 33%; margin-right: 1%; padding: 8px 12px;"
+            onclick="sendCommand('off')">Off</button>
+        <!-- <button class="btn btn-primary" style="width: 33%; margin-right: 1%; padding: 8px 12px;"
+            onclick="sendCommand('blue')">Blue</button> -->
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+    <script>
+        let previoustoxgas = 'Not test yet';
+        let previoustemp = 'Not test yet';
+        let previoushumid = 'Not test yet';
+        let previouspartic = 'Not test yet';
+        let ipAddress = null;
+        /**
+         * Confirm the provided IP address and start the data retrieval process.
+         */
+        function confirmIP() {
+            const input = document.getElementById('ipAddress').value;
+            if (input) {
+                ipAddress = input;
+                console.log(`IP address updated to ${ipAddress}`);
+                console.log("Starting data retrieval...");
+                repeatedlyFetchData();
+            }
+        }
+        /**
+         * Continuously fetch data with a delay.
+         */
+        async function repeatedlyFetchData() {
+            while (true) {
+                await fetchData();
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }
+        /**
+         * Fetch data from the specified IP address.
+         */
+        async function fetchData() {
+            console.log("Preparing to initiate HTTP request...");
+            try {
+                const response = await fetch(`http://${ipAddress}:8080/`);
+                console.log("Response received, checking...");
+
+                if (!response.ok) {
+                    console.log("Response has issues, terminating.");
+                    return;
+                }
+
+                console.log("Response is fine, parsing JSON...");
+
+                let data = await response.json();
+
+                data.temp = (data.temp !== 0) ? data.temp : previoustemp;
+                data.humid = (data.humid !== 0) ? data.humid : previoushumid;
+                data.toxgas = (data.toxgas !== 0) ? data.toxgas : previoustoxgas;
+                data.partic = (data.partic !== 0) ? data.partic : previouspartic;
+
+                console.log(`Data used: ${JSON.stringify(data)}`);
+
+                previoustemp = data.temp;
+                previoushumid = data.humid;
+                previouspartic = data.partic;
+                previoustoxgas = data.toxgas;
+                document.getElementById('temp').textContent = (typeof data.temp === "number") ? `${data.temp} ℃` : 'Not test yet';
+                document.getElementById('humid').textContent = (typeof data.humid === "number") ? `${data.humid} ％` : 'Not test yet';
+                document.getElementById('toxgas').textContent = (typeof data.toxgas === "number") ? `${data.toxgas} PPM` : 'Not test yet';
+                document.getElementById('partic').textContent = (typeof data.partic === "number") ? `${data.partic} ug/m3` : 'Not test yet';
+
+            } catch (error) {
+                console.log(`Error occurred: ${error}`);
+            }
+        }
+
+        async function sendCommand(command) {
+            console.log(`Preparing to send /${command} command...`);
+            try {
+                const response = await fetch(`http://${ipAddress}:8080/${command}`);
+                console.log("Response received, checking...");
+                if (!response.ok) {
+                    console.log("Response has issues, terminating.");
+                    return;
+                }
+                console.log("Response is fine.");
+            } catch (error) {
+                console.log(`Error occurred: ${error}`);
+            }
+        }
+    </script>
+</body>
+
+</html>
